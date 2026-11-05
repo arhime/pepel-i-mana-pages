@@ -1,0 +1,51 @@
+name: update-web
+
+# Обновлять веб-версию из последнего релиза основной игры.
+# Релиз собирает SDVGames-Studio/pepel-i-mana (publish.yml); здесь
+# скачиваем PepelIMana-web.zip и коммитим изменения в gh-pages.
+
+on:
+  schedule:
+    - cron: "23 * * * *"   # ежечасно
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-web
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v5
+        with:
+          ref: gh-pages
+
+      - name: Download latest web build
+        run: |
+          curl -sSfL -o /tmp/web.zip \
+            "https://github.com/SDVGames-Studio/pepel-i-mana/releases/download/latest/PepelIMana-web.zip"
+          unzip -oq /tmp/web.zip -d site
+          rm -f index.html index.js index.pck index.wasm \
+                index.audio.worklet.js index.audio.position.worklet.js \
+                index.icon.png index.apple-touch-icon.png index.png
+          cp site/* .
+          rm -rf site
+          test -s index.html
+          test -s index.wasm
+
+      - name: Commit if changed
+        run: |
+          git config user.name "web-updater"
+          git config user.email "arhime@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -q -m "web build from latest release"
+            git push origin gh-pages
+          fi
